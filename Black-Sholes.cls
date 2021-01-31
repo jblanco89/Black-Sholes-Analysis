@@ -79,28 +79,30 @@ End Sub
 
 Private Sub calibrate_Click()
 Dim vbSheetDest As Worksheet
-
 Dim ri As Double
 Dim n As Integer
 Dim d1, d2 As Double
 Dim C0, P0 As Double
 
+
 '**** ROI FROM CLOSED PRICES CALCULATION *****
 Set vbSheetDest = Worksheets("DataRaw") 'sheet name of destination workbook
+
+  lastRow = vbSheetDest.Cells(vbSheetDest.Rows.Count, "A").End(xlUp).Row
     
-    lastRow = vbSheetDest.Range("F" & Rows.Count).End(xlUp).Row - 2 'get the last row of origin data
+    'lastRow = vbSheetDest.Range("A" & Rows.Count).End(xlUp).Row 'get the last row of origin data
     vbSheetDest.Range("H2:P2").ColumnWidth = 17
-    
+    vbSheetDest.Range("H5") = 0
         
-        For i = 4 To lastRow
+        For i = 6 To lastRow
         
-            vbSheetDest.Range("H" & i) = vbSheetDest.Range("F" & i).Value / vbSheetDest.Range("F" & i - 1).Value
+        vbSheetDest.Range("H" & i) = vbSheetDest.Range("F" & i).Value / vbSheetDest.Range("F" & i - 1).Value
         
         Next i
         
         '**** LOG OF RISK (ri) CALCULATION ******
         
-        For i = 4 To lastRow
+        For i = 6 To lastRow
             
             vbSheetDest.Range("I" & i).Value = Log(vbSheetDest.Range("H" & i).Value)
         
@@ -125,7 +127,7 @@ Set vbSheetDest = Worksheets("DataRaw") 'sheet name of destination workbook
         vbSheetDest.Range("M2").Value = "Ln(ri-rho)^2"
         vbSheetDest.Range("N2").Value = "Sigma"
         
-        For i = 4 To lastRow
+        For i = 6 To lastRow
         
             vbSheetDest.Range("L" & i).Value = Log(vbSheetDest.Range("H" & i).Value - rho)
             vbSheetDest.Range("M" & i).Value = (vbSheetDest.Range("L" & i).Value) ^ 2
@@ -162,14 +164,16 @@ Private Sub Clear_Click()
 Dim thisWorksheet As Worksheet
 
 Set thisWorksheet = Workbooks(ThisWorkbook.Name).Worksheets("DataRaw")
-
-lastRow = thisWorksheet.Range("A" & Rows.Count).End(xlUp).Row - 2 'get the last row of origin data
-
-
-thisWorksheet.Range("A2:P" & lastRow).ClearContents
-
+lastRow = thisWorksheet.Range("A" & Rows.Count).End(xlUp).Row 'get the last row of origin data
+thisWorksheet.Range("A5:P" & lastRow).ClearContents
 thisWorksheet.Range("R5:R8").ClearContents
-
+thisWorksheet.Range("B2").ClearContents
+thisWorksheet.Range("D2").ClearContents
+thisWorksheet.Range("F2").ClearContents
+thisWorksheet.Range("J3").ClearContents
+thisWorksheet.Range("K3").ClearContents
+thisWorksheet.Range("N3").ClearContents
+thisWorksheet.Range("O3").ClearContents
 
 
 End Sub
@@ -197,7 +201,7 @@ lastRow = vbSheetOrigin.Range("A" & Rows.Count).End(xlUp).Row - 2 'get the last 
 vbSheetOrigin.Range("A1:F" & lastRow).Copy Destination:=vbSheetDest.Range("A2") 'copy data from origin workbook to destination sheet
 
 Workbooks(vbBookOrigin.Name).Close Savechanges:=False 'closing origin data workbook
-
+ 
  vbSheetDest.Range("A2:F360").Select
     With Selection.Font
         .Name = "Segoe UI"
@@ -216,3 +220,103 @@ Workbooks(vbBookOrigin.Name).Close Savechanges:=False 'closing origin data workb
 
 End Sub
 
+Private Sub ScrapYahoo_Click()
+Dim URL$, xml, table, Q&, Mat, iRow, i&, Ticker$
+Dim StartDate As Date
+Dim EndDate As Date
+Dim mFactor#, r&
+Dim lastRow
+
+Ticker = [b2]: StartDate = [d2]: EndDate = [f2]
+
+    If StartDate > EndDate Then
+        MsgBox "Please, check dates": End
+    End If
+
+    Application.ScreenUpdating = False
+    
+URL = "https://query1.finance.yahoo.com/v7/finance/download/" & _
+Ticker & "?period1=" & _
+date_Yahoo(StartDate) & "&period2=" & _
+date_Yahoo(EndDate) & "&interval=1d&events=history"
+
+    Do
+        Set xml = CreateObject("msXML2.XMLHttp")
+        xml.Open "Put", URL, False
+        xml.Send
+
+        table = Split(xml.responseText, vbLf)
+        Q = UBound(table) - 1
+    Loop While Q = -1
+
+ReDim Mat(1 To Q, 0 To 5)
+
+For i = 1 To Q
+  iRow = Split(table(i), ",")
+  If iRow(6) <> "null" Then
+    r = 1 + r
+    mFactor = Val(Replace(iRow(5), ",", "")) / Val(Replace(iRow(4), ",", ""))
+  
+    Mat(r, 0) = DateValue(iRow(0))
+    Mat(r, 1) = Round(Val(Replace(iRow(6), ",", "")), 5)
+    Mat(r, 2) = Round(mFactor * Val(Replace(iRow(1), ",", "")), 4)
+    Mat(r, 3) = Round(mFactor * Val(Replace(iRow(2), ",", "")), 4)
+    Mat(r, 4) = Round(mFactor * Val(Replace(iRow(3), ",", "")), 4)
+    Mat(r, 5) = Round(mFactor * Val(Replace(iRow(4), ",", "")), 4)
+  End If
+Next
+
+ThisWorkbook.Worksheets("WebQuery").Range("A4:F" & Q) = Mat
+
+Application.ScreenUpdating = True
+
+Set vbSheetOrigin = ThisWorkbook.Worksheets("WebQuery") 'sheet name of origin workbook
+Set vbSheetDest = ThisWorkbook.Worksheets("DataRaw") 'sheet name of destination workbook
+
+
+vbSheetOrigin.Range("A4:F" & Q).Copy Destination:=vbSheetDest.Range("A5") 'copy data from origin workbook to destination sheet
+
+Exit Sub
+
+verErr:
+Debug.Assert False
+Resume
+
+End Sub
+
+Private Function date_Yahoo(iDate As Date) As Long
+  date_Yahoo = 86400# * CLng(iDate) - 2209161600#
+End Function
+
+Private Sub testUserForm_Click()
+
+ImportTickert.Show
+
+End Sub
+
+Private Sub Worksheet_Change(ByVal Target As Range)
+Dim Range_1, Range_2, Range_3 As Range
+    
+Set Range_1 = ThisWorkbook.Worksheets("DataRaw").Range("A5:A10")
+Set Range_2 = ThisWorkbook.Worksheets("DataRaw").Range("H5:H10")
+Set Range_3 = ThisWorkbook.Worksheets("DataRaw").Range("B2")
+
+    ScrapYahoo.Enabled = False
+    calibrate.Enabled = False
+    B_Sholes.Enabled = False
+    Clear.Enabled = False
+
+        If Application.WorksheetFunction.CountA(Range_1) > 0 Then
+            ScrapYahoo.Enabled = True
+            calibrate.Enabled = True
+            Clear.Enabled = True
+        End If
+        If Application.WorksheetFunction.CountA(Range_2) > 0 Then
+            B_Sholes.Enabled = True
+            Clear.Enabled = True
+        End If
+        
+        If Application.WorksheetFunction.CountA(Range_3) > 0 Then
+            ScrapYahoo.Enabled = True
+        End If
+End Sub
