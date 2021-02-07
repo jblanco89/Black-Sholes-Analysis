@@ -93,6 +93,9 @@ Set vbSheetDest = Worksheets("DataRaw") 'sheet name of destination workbook
     'lastRow = vbSheetDest.Range("A" & Rows.Count).End(xlUp).Row 'get the last row of origin data
     vbSheetDest.Range("H2:P2").ColumnWidth = 17
     vbSheetDest.Range("H5") = 0
+    vbSheetDest.Columns("I").Hidden = True
+    vbSheetDest.Columns("L").Hidden = True
+    vbSheetDest.Columns("M").Hidden = True
         
         For i = 6 To lastRow
         
@@ -108,12 +111,12 @@ Set vbSheetDest = Worksheets("DataRaw") 'sheet name of destination workbook
         
         Next i
         
-        vbSheetDest.Range("H2").Value = "Daily Reveneu (ri)" 'ROI title
+        vbSheetDest.Range("H2").Value = "Returns (ri)" 'ROI title
         vbSheetDest.Range("I2").Value = "Log ri" ' Log(ri) title
         vbSheetDest.Range("K2").Value = "Rho" 'Rho Title (Deriva)
         
-        vbSheetDest.Range("J2").Value = "Nº Returns" 'Nº retorns title
-        n = lastRow 'Nº of Returns
+        vbSheetDest.Range("J2").Value = "Nº Entries" 'Nº entries title
+        n = lastRow - 4 'Nº of Returns
         vbSheetDest.Range("J3").Value = n
         
         
@@ -162,8 +165,11 @@ End Sub
 
 Private Sub Clear_Click()
 Dim thisWorksheet As Worksheet
+Dim sndWorksheet As Worksheet
 
 Set thisWorksheet = Workbooks(ThisWorkbook.Name).Worksheets("DataRaw")
+Set sndWorksheet = Workbooks(ThisWorkbook.Name).Worksheets("WebQuery")
+
 lastRow = thisWorksheet.Range("A" & Rows.Count).End(xlUp).Row 'get the last row of origin data
 thisWorksheet.Range("A5:P" & lastRow).ClearContents
 thisWorksheet.Range("R5:R8").ClearContents
@@ -175,47 +181,25 @@ thisWorksheet.Range("K3").ClearContents
 thisWorksheet.Range("N3").ClearContents
 thisWorksheet.Range("O3").ClearContents
 
+lastRow2 = sndWorksheet.Range("A" & Rows.Count).End(xlUp).Row
+sndWorksheet.Range("A4:F" & lastRow2).ClearContents
 
 End Sub
 
+Private Sub createGraph_Click()
+Dim Graph As ChartObject
+Dim thisWorksheet As Worksheet
 
-Private Sub getInfo_Click()
+Set thisWorksheet = Workbooks(ThisWorkbook.Name).Worksheets("DataRaw")
+Set Graph = thisWorksheet.ChartObjects.Add(Left:=400, Width:=600, Top:=50, Height:=400)
 
-Dim vbBookOrigen As Workbook
-Dim vbSheetOrigin As Worksheet
-Dim route As String
-Dim vbBookDest As Workbook
-Dim vbSheetDest As Worksheet
+lastRowA = thisWorksheet.Cells(thisWorksheet.Rows.Count, "A").End(xlUp).Row
+lastRowF = thisWorksheet.Cells(thisWorksheet.Rows.Count, "F").End(xlUp).Row
+Graph.Name = "Historical_Data"
+Graph.Chart.ChartType = xlXYScatterLines
+Graph.Chart.SetSourceData Source:=thisWorksheet.Range("A4:A" & lastRowA & ",F4:F" & lastRowF)
 
-'IMPORTANT: CHANGE route VARIABLE TO ABSOLUTE LOCATION WHERE ORIGIN XLSX FILE IS PLACED, EXAMPLE: c:\..\origin.xlsx
-route = "C:\Users\javie\OneDrive\Documentos\proyectos\Black-Sholes\IBE.MC.xlsx" 'get exactly route of origin information
-
-Set vbBookOrigin = Workbooks.Open(route)
-Set vbSheetOrigin = vbBookOrigin.Worksheets("IBE.MC") 'sheet name of origin workbook
-Set vbBookDest = Workbooks(ThisWorkbook.Name)
-Set vbSheetDest = vbBookDest.Worksheets("DataRaw") 'sheet name of destination workbook
-
-
-lastRow = vbSheetOrigin.Range("A" & Rows.Count).End(xlUp).Row - 2 'get the last row of origin data
-
-vbSheetOrigin.Range("A1:F" & lastRow).Copy Destination:=vbSheetDest.Range("A2") 'copy data from origin workbook to destination sheet
-
-Workbooks(vbBookOrigin.Name).Close Savechanges:=False 'closing origin data workbook
- 
- vbSheetDest.Range("A2:F360").Select
-    With Selection.Font
-        .Name = "Segoe UI"
-        .Size = 11
-        .Strikethrough = False
-        .Superscript = False
-        .Subscript = False
-        .OutlineFont = False
-        .Shadow = False
-        .Underline = xlUnderlineStyleNone
-        .ThemeColor = xlThemeColorLight1
-        .TintAndShade = 0
-        .ThemeFont = xlThemeFontNone
-    End With
+Call editGraph
 
 
 End Sub
@@ -226,6 +210,8 @@ Dim StartDate As Date
 Dim EndDate As Date
 Dim mFactor#, r&
 Dim lastRow
+
+Call clearData
 
 Ticker = [b2]: StartDate = [d2]: EndDate = [f2]
 
